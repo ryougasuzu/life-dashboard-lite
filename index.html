@@ -4,7 +4,7 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
   <meta name="theme-color" content="#151821">
-  <meta name="description" content="食事・栄養・筋トレ・有酸素を記録するLife Dashboard Lite">
+  <meta name="description" content="食事・栄養を可視化し、筋トレ・有酸素を記録するLife Dashboard Lite">
   <title>Life Dashboard Lite</title>
   <link rel="stylesheet" href="./css/app.css">
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0"></script>
@@ -51,7 +51,6 @@
   <main id="appPanel" hidden>
     <nav class="tabs" aria-label="画面切替">
       <button class="tab active" data-view="dashboard" type="button">ダッシュボード</button>
-      <button class="tab" data-view="meal" type="button">食事</button>
       <button class="tab" data-view="strength" type="button">筋トレ</button>
       <button class="tab" data-view="cardio" type="button">有酸素</button>
       <button class="tab" data-view="nutrition" type="button">栄養</button>
@@ -86,7 +85,14 @@
 
       <div class="detailsGrid">
         <article class="card listCard">
-          <div class="listHead"><div><p class="eyebrow">MEALS</p><h3>食事</h3></div><span id="mealCount" class="countPill">0</span></div>
+          <div class="listHead">
+            <div>
+              <p class="eyebrow">MEALS · READ ONLY</p>
+              <h3>食事</h3>
+            </div>
+            <span id="mealCount" class="countPill">0</span>
+          </div>
+          <p class="muted">食事はPagesから登録せず、外部からSupabaseへ保存された記録を表示します。</p>
           <div id="mealHistory"></div>
         </article>
         <article class="card listCard">
@@ -98,45 +104,6 @@
           <div id="cardioHistory"></div>
         </article>
       </div>
-    </section>
-
-    <section class="view" data-view-panel="meal">
-      <div class="sectionHead"><div><p class="eyebrow">ADD MEAL</p><h2>食事を記録</h2></div></div>
-      <form id="mealForm" class="card editorCard formGrid">
-        <label>日時<input id="mealEatenAt" type="datetime-local" required></label>
-        <label>区分
-          <select id="mealType">
-            <option value="breakfast">朝食</option>
-            <option value="lunch">昼食</option>
-            <option value="dinner">夕食</option>
-            <option value="snack">間食</option>
-            <option value="supplement">サプリ</option>
-            <option value="other">その他</option>
-          </select>
-        </label>
-        <label class="wide">名前<input id="mealName" type="text" required placeholder="例: 鶏むね肉とご飯"></label>
-        <label class="wide">量・メモ用表記<input id="mealQuantity" type="text" placeholder="例: 鶏むね125g + 米0.7合"></label>
-        <label>kcal<input id="mealKcal" type="number" min="0" step="0.01"></label>
-        <label>たんぱく質 g<input id="mealProtein" type="number" min="0" step="0.01"></label>
-        <label>脂質 g<input id="mealFat" type="number" min="0" step="0.01"></label>
-        <label>炭水化物 g<input id="mealCarbs" type="number" min="0" step="0.01"></label>
-        <label class="check wide"><input id="mealEstimated" type="checkbox" checked> 栄養値に推定を含む</label>
-        <label class="wide">出典<input id="mealSource" type="text" placeholder="メーカー公式 / 食品成分表 / 推定 など"></label>
-        <label class="wide">備考<textarea id="mealNotes" rows="2"></textarea></label>
-
-        <div class="wide subSection">
-          <div class="subSectionHead">
-            <div><p class="eyebrow">OPTIONAL</p><h3>詳細栄養素</h3></div>
-            <span class="muted">不明な項目は空欄のまま</span>
-          </div>
-          <div id="mealMicronutrientFields" class="microInputGrid"></div>
-        </div>
-
-        <div class="actions wide">
-          <button class="primary" type="submit">食事を登録</button>
-        </div>
-        <p id="mealMessage" class="message wide"></p>
-      </form>
     </section>
 
     <section class="view" data-view-panel="strength">
@@ -177,9 +144,10 @@
 
     <section class="view" data-view-panel="nutrition">
       <div class="sectionHead">
-        <div><p class="eyebrow">NUTRITION</p><h2>栄養</h2></div>
+        <div><p class="eyebrow">NUTRITION · READ ONLY</p><h2>栄養</h2></div>
         <input id="nutritionDay" class="dateControl" type="date">
       </div>
+      <p class="muted">食事・栄養データは外部入力されたSupabaseの値を参照します。</p>
       <div id="nutritionMacroGrid" class="metricGrid"></div>
       <section class="card nutritionCard">
         <div class="subSectionHead">
