@@ -1,0 +1,221 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+  <meta name="theme-color" content="#151821">
+  <meta name="description" content="食事・栄養・筋トレ・有酸素を記録するLife Dashboard Lite">
+  <title>Life Dashboard Lite</title>
+  <link rel="stylesheet" href="./css/app.css">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.115.0"></script>
+  <script src="./js/config.js"></script>
+  <script src="./js/app.js" defer></script>
+</head>
+<body>
+<div class="shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">FOOD · NUTRITION · TRAINING</p>
+      <h1>Life Dashboard Lite</h1>
+    </div>
+    <div class="topActions">
+      <span id="accountLabel" class="accountLabel"></span>
+      <button id="signOutBtn" class="ghost" type="button" hidden>ログアウト</button>
+    </div>
+  </header>
+
+  <section id="setupWarning" class="card warning" hidden>
+    <strong>Supabase設定が未完了です。</strong>
+    <p><code>js/config.js</code> のURLとpublishable keyを自分のSupabase Projectの値へ変更してください。</p>
+  </section>
+
+  <section id="authPanel" class="card authCard">
+    <p class="eyebrow">PRIVATE ACCESS</p>
+    <h2>ログイン</h2>
+    <p class="muted">Supabase Auth + RLSで、自分の記録だけを読み書きします。</p>
+    <form id="authForm" class="formGrid">
+      <label class="wide">メール
+        <input id="email" type="email" autocomplete="email" required>
+      </label>
+      <label class="wide">パスワード
+        <input id="password" type="password" autocomplete="current-password" minlength="8" required>
+      </label>
+      <div class="actions wide">
+        <button class="primary" type="submit">ログイン</button>
+        <button id="signUpBtn" class="secondary" type="button">初回登録</button>
+      </div>
+    </form>
+    <p id="authMessage" class="message"></p>
+  </section>
+
+  <main id="appPanel" hidden>
+    <nav class="tabs" aria-label="画面切替">
+      <button class="tab active" data-view="dashboard" type="button">ダッシュボード</button>
+      <button class="tab" data-view="meal" type="button">食事</button>
+      <button class="tab" data-view="strength" type="button">筋トレ</button>
+      <button class="tab" data-view="cardio" type="button">有酸素</button>
+      <button class="tab" data-view="nutrition" type="button">栄養</button>
+      <button class="tab" data-view="settings" type="button">設定</button>
+    </nav>
+
+    <section class="view active" data-view-panel="dashboard">
+      <div class="sectionHead">
+        <div><p class="eyebrow">MONTH</p><h2 id="monthTitle">—</h2></div>
+        <div class="calendarNav">
+          <button id="prevMonthBtn" class="mini" type="button">←</button>
+          <button id="todayBtn" class="mini" type="button">今月</button>
+          <button id="nextMonthBtn" class="mini" type="button">→</button>
+        </div>
+      </div>
+
+      <section class="card calendarWrap">
+        <div class="legend">
+          <span><i class="dot strength"></i>筋トレ</span>
+          <span><i class="dot cardio"></i>有酸素</span>
+        </div>
+        <div class="weekdayRow"><div>月</div><div>火</div><div>水</div><div>木</div><div>金</div><div>土</div><div>日</div></div>
+        <div id="calendarGrid" class="calendarGrid"></div>
+      </section>
+
+      <div class="sectionHead selectedHead">
+        <div><p class="eyebrow">SELECTED DAY</p><h2 id="selectedDateTitle">—</h2></div>
+        <button id="refreshBtn" class="mini" type="button">更新</button>
+      </div>
+
+      <div id="metricGrid" class="metricGrid"></div>
+
+      <div class="detailsGrid">
+        <article class="card listCard">
+          <div class="listHead"><div><p class="eyebrow">MEALS</p><h3>食事</h3></div><span id="mealCount" class="countPill">0</span></div>
+          <div id="mealHistory"></div>
+        </article>
+        <article class="card listCard">
+          <div class="listHead"><div><p class="eyebrow">STRENGTH</p><h3>筋トレ</h3></div><span id="strengthCount" class="countPill">0</span></div>
+          <div id="strengthHistory"></div>
+        </article>
+        <article class="card listCard">
+          <div class="listHead"><div><p class="eyebrow">CARDIO</p><h3>有酸素</h3></div><span id="cardioCount" class="countPill">0</span></div>
+          <div id="cardioHistory"></div>
+        </article>
+      </div>
+    </section>
+
+    <section class="view" data-view-panel="meal">
+      <div class="sectionHead"><div><p class="eyebrow">ADD MEAL</p><h2>食事を記録</h2></div></div>
+      <form id="mealForm" class="card editorCard formGrid">
+        <label>日時<input id="mealEatenAt" type="datetime-local" required></label>
+        <label>区分
+          <select id="mealType">
+            <option value="breakfast">朝食</option>
+            <option value="lunch">昼食</option>
+            <option value="dinner">夕食</option>
+            <option value="snack">間食</option>
+            <option value="supplement">サプリ</option>
+            <option value="other">その他</option>
+          </select>
+        </label>
+        <label class="wide">名前<input id="mealName" type="text" required placeholder="例: 鶏むね肉とご飯"></label>
+        <label class="wide">量・メモ用表記<input id="mealQuantity" type="text" placeholder="例: 鶏むね125g + 米0.7合"></label>
+        <label>kcal<input id="mealKcal" type="number" min="0" step="0.01"></label>
+        <label>たんぱく質 g<input id="mealProtein" type="number" min="0" step="0.01"></label>
+        <label>脂質 g<input id="mealFat" type="number" min="0" step="0.01"></label>
+        <label>炭水化物 g<input id="mealCarbs" type="number" min="0" step="0.01"></label>
+        <label class="check wide"><input id="mealEstimated" type="checkbox" checked> 栄養値に推定を含む</label>
+        <label class="wide">出典<input id="mealSource" type="text" placeholder="メーカー公式 / 食品成分表 / 推定 など"></label>
+        <label class="wide">備考<textarea id="mealNotes" rows="2"></textarea></label>
+
+        <div class="wide subSection">
+          <div class="subSectionHead">
+            <div><p class="eyebrow">OPTIONAL</p><h3>詳細栄養素</h3></div>
+            <span class="muted">不明な項目は空欄のまま</span>
+          </div>
+          <div id="mealMicronutrientFields" class="microInputGrid"></div>
+        </div>
+
+        <div class="actions wide">
+          <button class="primary" type="submit">食事を登録</button>
+        </div>
+        <p id="mealMessage" class="message wide"></p>
+      </form>
+    </section>
+
+    <section class="view" data-view-panel="strength">
+      <div class="sectionHead"><div><p class="eyebrow">ADD STRENGTH</p><h2>筋トレを記録</h2></div></div>
+      <form id="strengthForm" class="card editorCard formGrid">
+        <label>日時<input id="strengthStartedAt" type="datetime-local" required></label>
+        <label>種目<input id="strengthExercise" type="text" required placeholder="例: Chest Press"></label>
+        <label class="wide">セッションメモ<textarea id="strengthNotes" rows="2"></textarea></label>
+        <div class="wide subSection">
+          <div class="subSectionHead">
+            <div><p class="eyebrow">SETS</p><h3>セット</h3></div>
+            <button id="addSetBtn" class="mini" type="button">＋ セット</button>
+          </div>
+          <div class="setHeader"><span>重量kg</span><span>回数</span><span>RIR</span><span>種別</span><span></span></div>
+          <div id="setRows"></div>
+        </div>
+        <div class="actions wide"><button class="primary" type="submit">筋トレを登録</button></div>
+        <p id="strengthMessage" class="message wide"></p>
+      </form>
+    </section>
+
+    <section class="view" data-view-panel="cardio">
+      <div class="sectionHead"><div><p class="eyebrow">ADD CARDIO</p><h2>有酸素を記録</h2></div></div>
+      <form id="cardioForm" class="card editorCard formGrid">
+        <label>日時<input id="cardioStartedAt" type="datetime-local" required></label>
+        <label>種目<input id="cardioType" type="text" value="run" required></label>
+        <label>距離 km<input id="cardioDistance" type="number" min="0" step="0.001"></label>
+        <label>時間 分<input id="cardioDurationMin" type="number" min="0" step="0.1"></label>
+        <label>平均心拍<input id="cardioAvgHr" type="number" min="1" step="1"></label>
+        <label>最大心拍<input id="cardioMaxHr" type="number" min="1" step="1"></label>
+        <label>RPE 0–10<input id="cardioRpe" type="number" min="0" max="10" step="0.5"></label>
+        <label>出典<input id="cardioSource" type="text" placeholder="手入力 / Garmin / Huawei など"></label>
+        <label class="wide">備考<textarea id="cardioNotes" rows="2"></textarea></label>
+        <div class="actions wide"><button class="primary" type="submit">有酸素を登録</button></div>
+        <p id="cardioMessage" class="message wide"></p>
+      </form>
+    </section>
+
+    <section class="view" data-view-panel="nutrition">
+      <div class="sectionHead">
+        <div><p class="eyebrow">NUTRITION</p><h2>栄養</h2></div>
+        <input id="nutritionDay" class="dateControl" type="date">
+      </div>
+      <div id="nutritionMacroGrid" class="metricGrid"></div>
+      <section class="card nutritionCard">
+        <div class="subSectionHead">
+          <div><p class="eyebrow">MICRONUTRIENTS</p><h3>ビタミン・ミネラル等</h3></div>
+          <span class="muted">未登録は0扱いしません</span>
+        </div>
+        <div id="micronutrientList"></div>
+      </section>
+    </section>
+
+    <section class="view" data-view-panel="settings">
+      <div class="sectionHead"><div><p class="eyebrow">SETTINGS</p><h2>設定</h2></div></div>
+      <form id="settingsForm" class="card editorCard formGrid">
+        <label class="wide">タイムゾーン
+          <input id="timezone" type="text" value="Asia/Tokyo" placeholder="Asia/Tokyo">
+        </label>
+        <label>目標 kcal<input id="targetCalories" type="number" min="0" step="1"></label>
+        <label>たんぱく質 g<input id="targetProtein" type="number" min="0" step="0.1"></label>
+        <label>脂質 g<input id="targetFat" type="number" min="0" step="0.1"></label>
+        <label>炭水化物 g<input id="targetCarbs" type="number" min="0" step="0.1"></label>
+
+        <div class="wide subSection">
+          <div class="subSectionHead">
+            <div><p class="eyebrow">OPTIONAL TARGETS</p><h3>詳細栄養素の目標</h3></div>
+            <span class="muted">必要な項目だけ入力</span>
+          </div>
+          <div id="nutrientTargetFields" class="microInputGrid"></div>
+        </div>
+
+        <div class="actions wide"><button class="primary" type="submit">設定を保存</button></div>
+        <p id="settingsMessage" class="message wide"></p>
+      </form>
+    </section>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+</div>
+</body>
+</html>
