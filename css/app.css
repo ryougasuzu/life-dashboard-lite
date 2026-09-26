@@ -1,0 +1,145 @@
+:root{
+  --bg:#f6f7f9;
+  --card:#fff;
+  --ink:#151821;
+  --muted:#707784;
+  --line:#e3e7ee;
+  --soft:#eef2f6;
+  --accent:#151821;
+  --strength:#16a34a;
+  --cardio:#ea580c;
+  --today:#fff7df;
+  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Noto Sans JP",sans-serif;
+  color-scheme:light;
+}
+*{box-sizing:border-box}
+html{background:var(--bg)}
+body{margin:0;background:var(--bg);color:var(--ink);min-height:100vh}
+button,input,select,textarea{font:inherit}
+button{color:inherit}
+.shell{width:min(100%,1080px);margin:0 auto;padding:calc(14px + env(safe-area-inset-top)) 14px calc(36px + env(safe-area-inset-bottom))}
+.topbar{display:flex;justify-content:space-between;align-items:center;gap:12px;padding:4px 2px 12px}
+.topbar h1{margin:0;font-size:26px;line-height:1.08;letter-spacing:-.04em}
+.eyebrow{margin:0 0 4px;font-size:9px;line-height:1.2;letter-spacing:.14em;font-weight:850;color:var(--muted)}
+.topActions{display:flex;align-items:center;gap:8px}
+.accountLabel{max-width:220px;font-size:10px;color:var(--muted);overflow-wrap:anywhere}
+.card{background:var(--card);border:1px solid var(--line);border-radius:20px;box-shadow:0 6px 20px rgba(15,23,42,.04)}
+.warning{padding:14px 16px;margin-bottom:12px;background:#fff8e8;border-color:#ead7a1}
+.warning p{margin:5px 0 0;font-size:12px;line-height:1.6}
+.ghost,.primary,.secondary,.mini,.tab{border-radius:12px;font-weight:750;cursor:pointer}
+.ghost{padding:8px 10px;background:#fff;border:1px solid var(--line);font-size:11px}
+.primary,.secondary{min-height:44px;padding:0 14px;border:1px solid var(--accent)}
+.primary{background:var(--accent);color:#fff}
+.secondary{background:#fff;color:var(--ink)}
+.mini{min-height:36px;padding:7px 10px;border:1px solid var(--line);background:#fff}
+.authCard{padding:18px}
+.authCard h2,.sectionHead h2{margin:0;letter-spacing:-.03em}
+.muted{color:var(--muted);font-size:11px;line-height:1.6}
+.message{min-height:18px;margin:10px 0 0;font-size:12px;color:var(--muted)}
+.formGrid{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+.formGrid label{display:grid;gap:6px;font-size:11px;font-weight:750;color:var(--muted)}
+.formGrid input,.formGrid select,.formGrid textarea,.dateControl{
+  width:100%;min-height:44px;border:1px solid var(--line);border-radius:12px;background:#fbfcfd;color:var(--ink);padding:9px 11px;outline:none
+}
+.formGrid textarea{resize:vertical}
+.formGrid input:focus,.formGrid select:focus,.formGrid textarea:focus,.dateControl:focus{border-color:#9aa4b2;box-shadow:0 0 0 3px rgba(148,163,184,.18)}
+.wide{grid-column:1/-1}
+.check{display:flex!important;align-items:center!important;grid-template-columns:auto 1fr!important;justify-content:flex-start}
+.check input{width:18px!important;min-height:18px!important}
+.actions{display:flex;gap:8px}
+.tabs{display:flex;gap:6px;overflow-x:auto;padding:3px 0 14px;scrollbar-width:none}
+.tabs::-webkit-scrollbar{display:none}
+.tab{flex:0 0 auto;border:1px solid var(--line);background:#fff;padding:9px 11px;font-size:11px}
+.tab.active{background:var(--ink);border-color:var(--ink);color:#fff}
+.view{display:none}
+.view.active{display:block}
+.sectionHead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin:10px 0 11px}
+.calendarNav{display:flex;gap:6px}
+.calendarWrap{padding:12px;overflow:hidden}
+.legend{display:flex;gap:14px;margin-bottom:11px;font-size:10px;color:var(--muted)}
+.legend span{display:inline-flex;align-items:center}
+.dot,.marker{display:inline-block;width:7px;height:7px;border-radius:999px}
+.dot{margin-right:5px}
+.strength{background:var(--strength)}
+.cardio{background:var(--cardio)}
+.weekdayRow,.calendarGrid{display:grid;grid-template-columns:repeat(7,minmax(0,1fr))}
+.weekdayRow{margin-bottom:5px}
+.weekdayRow div{text-align:center;font-size:9px;font-weight:800;color:var(--muted)}
+.calendarGrid{gap:5px}
+.dayBlank{min-height:68px}
+.dayCell{min-width:0;min-height:68px;border:1px solid var(--line);border-radius:13px;background:#fbfcfe;padding:7px;display:flex;flex-direction:column;justify-content:space-between;cursor:pointer;overflow:hidden}
+.dayCell.today{background:var(--today);border-color:#ead9a8}
+.dayCell.selected{background:var(--ink);border-color:var(--ink);color:#fff}
+.dayNum{font-size:11px;font-weight:850}
+.dayKcal{font-size:9px;color:var(--muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;width:100%}
+.dayCell.selected .dayKcal{color:#d7dbe2}
+.dayMarkers{display:flex;gap:4px;min-height:7px}
+.selectedHead{margin-top:24px}
+.metricGrid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+.metric{min-width:0;background:#fff;border:1px solid var(--line);border-radius:16px;padding:13px}
+.metricLabel{font-size:9px;color:var(--muted);font-weight:800}
+.metricValue{margin-top:5px;font-size:20px;line-height:1.15;font-weight:850;letter-spacing:-.04em;overflow-wrap:anywhere}
+.metricValue small{font-size:10px;font-weight:750;color:var(--muted)}
+.metricSub{margin-top:4px;min-height:13px;font-size:9px;color:var(--muted)}
+.bar{height:5px;background:#eef2f6;border-radius:99px;overflow:hidden;margin-top:8px}
+.bar i{display:block;height:100%;background:#151821;border-radius:99px}
+.detailsGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-top:11px}
+.listCard{padding:15px;min-width:0}
+.listHead{display:flex;align-items:flex-start;justify-content:space-between;gap:10px;margin-bottom:6px}
+.listCard h3,.subSectionHead h3{font-size:15px;margin:0}
+.countPill{min-width:26px;text-align:center;padding:5px 7px;border-radius:999px;background:var(--soft);font-size:10px;font-weight:850;color:var(--muted)}
+.historyItem{padding:10px 0;border-top:1px solid var(--line);font-size:12px;line-height:1.55;overflow-wrap:anywhere}
+.historyItem:first-child{border-top:0}
+.historyItem strong{display:block;font-size:13px}
+.historyMeta,.historyNotes{color:var(--muted);font-size:10px;margin-top:3px}
+.exerciseBlock{margin-top:7px;padding:8px 9px;background:#f7f9fb;border-radius:10px}
+.exerciseName{font-size:10px;font-weight:850}
+.setLine{font-size:10px;color:var(--muted);margin-top:2px}
+.empty{color:var(--muted);font-size:11px;padding:8px 0}
+.editorCard{padding:16px}
+.subSection{margin-top:4px;padding-top:14px;border-top:1px solid var(--line)}
+.subSectionHead{display:flex;justify-content:space-between;align-items:flex-end;gap:12px;margin-bottom:10px}
+.microInputGrid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px}
+.microField{display:grid;grid-template-columns:1fr auto;gap:6px;align-items:center}
+.microField label{display:block;font-size:10px}
+.microField small{font-size:9px;color:var(--muted)}
+.setHeader,.setRow{display:grid;grid-template-columns:1fr 1fr .8fr 1.3fr 38px;gap:6px;align-items:center}
+.setHeader{font-size:9px;font-weight:800;color:var(--muted);padding:0 3px 5px}
+.setRow{margin-bottom:7px}
+.setRow input,.setRow select{min-height:38px}
+.removeSet{width:38px;height:38px;border:1px solid var(--line);background:#fff;border-radius:10px;cursor:pointer}
+.nutritionCard{padding:16px;margin-top:10px}
+.nutrientRow{display:grid;grid-template-columns:minmax(150px,1.2fr) minmax(110px,.8fr) minmax(120px,1fr);gap:10px;align-items:center;padding:10px 0;border-top:1px solid var(--line)}
+.nutrientRow:first-child{border-top:0}
+.nutrientName strong{display:block;font-size:12px}
+.nutrientName small,.nutrientMeta{font-size:9px;color:var(--muted)}
+.nutrientValue{font-size:13px;font-weight:800;text-align:right}
+.nutrientProgress .bar{margin:0}
+.toast{position:fixed;left:50%;bottom:24px;transform:translateX(-50%);z-index:50;max-width:calc(100vw - 28px);background:#151821;color:#fff;border-radius:999px;padding:10px 14px;font-size:12px;box-shadow:0 12px 30px rgba(0,0,0,.18);text-align:center}
+code{font-family:ui-monospace,SFMono-Regular,Menlo,monospace}
+@media(max-width:860px){
+  .detailsGrid{grid-template-columns:1fr}
+  .microInputGrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+}
+@media(max-width:640px){
+  .shell{padding-left:10px;padding-right:10px}
+  .topbar{align-items:flex-start}
+  .topbar .eyebrow{display:none}
+  .topbar h1{font-size:22px}
+  .accountLabel{display:none}
+  .formGrid{grid-template-columns:1fr}
+  .wide{grid-column:auto}
+  .metricGrid{grid-template-columns:repeat(2,minmax(0,1fr));gap:6px}
+  .microInputGrid{grid-template-columns:1fr}
+  .calendarWrap{padding:8px}
+  .calendarGrid{gap:3px}
+  .dayBlank,.dayCell{min-height:52px}
+  .dayCell{border-radius:9px;padding:5px}
+  .dayKcal{font-size:8px}
+  .setHeader{display:none}
+  .setRow{grid-template-columns:1fr 1fr .8fr}
+  .setRow select{grid-column:1/3}
+  .removeSet{grid-column:3;grid-row:2}
+  .nutrientRow{grid-template-columns:1fr auto}
+  .nutrientProgress{grid-column:1/-1}
+}
