@@ -2,6 +2,8 @@
 
 食事・栄養の可視化と、筋トレ・有酸素の手動記録に絞った個人用Life Dashboardです。
 
+> **ChatGPTに導入作業を任せる場合:** [INSTALL_WITH_CHATGPT.md](./INSTALL_WITH_CHATGPT.md) を使ってください。
+
 - Frontend: GitHub Pages（静的HTML/CSS/JavaScript）
 - Backend: Supabase（Database + Auth + RLS）
 - 1人1 Supabase Projectを想定
