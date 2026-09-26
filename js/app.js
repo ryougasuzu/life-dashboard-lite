@@ -29,6 +29,7 @@ function el(id) {
 
 function showMessage(id, text, isError) {
   const node = el(id);
+  if (!node) return;
   node.textContent = text || "";
   node.style.color = isError ? "#a13c3c" : "";
 }
@@ -62,9 +63,10 @@ function round(value, digits) {
 }
 
 function dateInTimezone(date, timezone) {
+  const tz = timezone || cfg.defaultTimezone || "Asia/Tokyo";
   try {
     return new Intl.DateTimeFormat("en-CA", {
-      timeZone: timezone || "Asia/Tokyo",
+      timeZone: tz,
       year: "numeric",
       month: "2-digit",
       day: "2-digit"
@@ -91,25 +93,24 @@ function dayLabel(day) {
   return Number(parts[0]) + "年" + Number(parts[1]) + "月" + Number(parts[2]) + "日";
 }
 
-function monthKey(date) {
-  return date.getFullYear() + "-" + String(date.getMonth() + 1).padStart(2, "0");
-}
-
 function metricCard(label, value, unit, target, knownCount, itemCount) {
   const known = value != null;
   const display = known ? escapeHtml(round(value, 1)) : "—";
   let sub = "";
+
   if (knownCount != null && itemCount != null && Number(knownCount) < Number(itemCount)) {
     sub = "一部未算出 " + knownCount + "/" + itemCount + "件";
   } else if (knownCount != null && itemCount != null && Number(itemCount) > 0) {
     sub = "算出済み " + knownCount + "/" + itemCount + "件";
   }
+
   let bar = "";
   if (known && target != null && Number(target) > 0) {
     const pct = Math.max(0, Math.min(100, Number(value) / Number(target) * 100));
     bar = '<div class="bar"><i style="width:' + pct + '%"></i></div>';
     sub = (sub ? sub + " · " : "") + "目標 " + round(target, 1) + " " + unit;
   }
+
   return '<div class="metric">' +
     '<div class="metricLabel">' + escapeHtml(label) + '</div>' +
     '<div class="metricValue">' + display + ' <small>' + escapeHtml(unit) + '</small></div>' +
@@ -127,7 +128,7 @@ function setAppVisible(isSignedIn) {
 
 function setDefaultFormTimes() {
   const now = toDatetimeLocal(new Date());
-  ["mealEatenAt", "strengthStartedAt", "cardioStartedAt"].forEach(function (id) {
+  ["strengthStartedAt", "cardioStartedAt"].forEach(function (id) {
     if (!el(id).value) el(id).value = now;
   });
 }
@@ -135,6 +136,7 @@ function setDefaultFormTimes() {
 async function ensureProfile() {
   const result = await db.from("life_profiles").select("*").eq("user_id", session.user.id).maybeSingle();
   if (result.error) throw result.error;
+
   if (!result.data) {
     const created = await db.from("life_profiles").insert({
       user_id: session.user.id,
@@ -151,22 +153,7 @@ async function loadNutrientDefinitions() {
   const result = await db.from("life_nutrient_definitions").select("*").order("sort_order");
   if (result.error) throw result.error;
   nutrientDefs = result.data || [];
-  renderMealMicroFields();
   renderNutrientTargetFields();
-}
-
-function renderMealMicroFields() {
-  const host = el("mealMicronutrientFields");
-  host.innerHTML = "";
-  nutrientDefs.forEach(function (n) {
-    const wrap = document.createElement("div");
-    wrap.className = "microField";
-    wrap.innerHTML =
-      '<label>' + escapeHtml(n.name_ja) +
-      '<input type="number" min="0" step="any" data-meal-nutrient="' + escapeHtml(n.code) + '"></label>' +
-      '<small>' + escapeHtml(n.unit) + '</small>';
-    host.appendChild(wrap);
-  });
 }
 
 function renderNutrientTargetFields() {
@@ -180,21 +167,25 @@ function renderNutrientTargetFields() {
     wrap.className = "microField";
     wrap.innerHTML =
       '<label>' + escapeHtml(n.name_ja) +
-      '<input type="number" min="0" step="any" data-target-nutrient="' + escapeHtml(n.code) + '" value="' + escapeHtml(current) + '"></label>' +
+      '<input type="number" min="0" step="any" data-target-nutrient="' + escapeHtml(n.code) +
+      '" value="' + escapeHtml(current) + '"></label>' +
       '<small>' + escapeHtml(n.unit) + '</small>';
     host.appendChild(wrap);
   });
 }
 
 async function loadSettings() {
-  const a = await db.from("life_targets").select("*").eq("user_id", session.user.id).maybeSingle();
-  if (a.error) throw a.error;
-  targets = a.data || {};
+  const mainTargets = await db.from("life_targets").select("*").eq("user_id", session.user.id).maybeSingle();
+  if (mainTargets.error) throw mainTargets.error;
+  targets = mainTargets.data || {};
 
-  const b = await db.from("life_nutrient_targets").select("*").eq("user_id", session.user.id);
-  if (b.error) throw b.error;
+  const detailTargets = await db.from("life_nutrient_targets").select("*").eq("user_id", session.user.id);
+  if (detailTargets.error) throw detailTargets.error;
+
   nutrientTargets = {};
-  (b.data || []).forEach(function (row) { nutrientTargets[row.nutrient_code] = row; });
+  (detailTargets.data || []).forEach(function (row) {
+    nutrientTargets[row.nutrient_code] = row;
+  });
 
   el("timezone").value = profile.timezone || cfg.defaultTimezone || "Asia/Tokyo";
   el("targetCalories").value = targets.calories_kcal == null ? "" : targets.calories_kcal;
@@ -258,27 +249,32 @@ function renderCalendar(year, month, byDay) {
 
   const today = dateInTimezone(new Date(), profile.timezone);
   const days = new Date(year, month + 1, 0).getDate();
+
   for (let d = 1; d <= days; d++) {
     const day = year + "-" + String(month + 1).padStart(2, "0") + "-" + String(d).padStart(2, "0");
     const row = byDay[day] || {};
     const cell = document.createElement("button");
     cell.type = "button";
-    cell.className = "dayCell" + (day === today ? " today" : "") + (day === selectedDay ? " selected" : "");
+    cell.className = "dayCell" +
+      (day === today ? " today" : "") +
+      (day === selectedDay ? " selected" : "");
+
     const kcal = row.calories_kcal == null ? "" : round(row.calories_kcal, 0) + " kcal";
     let markers = "";
     if (Number(row.strength_sessions || 0) > 0) markers += '<i class="marker strength"></i>';
     if (Number(row.cardio_sessions || 0) > 0) markers += '<i class="marker cardio"></i>';
+
     cell.innerHTML =
       '<span class="dayNum">' + d + '</span>' +
       '<span class="dayKcal">' + escapeHtml(kcal) + '</span>' +
       '<span class="dayMarkers">' + markers + '</span>';
+
     cell.addEventListener("click", function () {
       selectedDay = day;
       el("nutritionDay").value = day;
-      loadMonth().catch(console.error);
-      loadSelectedDay().catch(console.error);
-      loadNutrition().catch(console.error);
+      Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()]).catch(console.error);
     });
+
     host.appendChild(cell);
   }
 }
@@ -294,7 +290,10 @@ async function loadSelectedDay() {
     db.from("life_cardio_sessions_local").select("*").eq("day", selectedDay).order("started_at")
   ]);
 
-  results.forEach(function (r) { if (r.error) throw r.error; });
+  results.forEach(function (r) {
+    if (r.error) throw r.error;
+  });
+
   const nutrition = results[0].data || {};
   const meals = results[1].data || [];
   const workouts = results[2].data || [];
@@ -344,6 +343,7 @@ function renderMeals(rows) {
     el("mealHistory").innerHTML = '<div class="empty">記録なし</div>';
     return;
   }
+
   el("mealHistory").innerHTML = rows.map(function (m) {
     const macros = [
       m.kcal == null ? null : round(m.kcal, 0) + " kcal",
@@ -351,6 +351,7 @@ function renderMeals(rows) {
       m.fat_g == null ? null : "F " + round(m.fat_g, 1) + "g",
       m.carbs_g == null ? null : "C " + round(m.carbs_g, 1) + "g"
     ].filter(Boolean).join(" · ");
+
     return '<div class="historyItem">' +
       '<strong>' + escapeHtml(m.name) + '</strong>' +
       '<div class="historyMeta">' + escapeHtml(formatClock(m.eaten_at)) +
@@ -368,17 +369,20 @@ function renderStrength(sessions, sets) {
     el("strengthHistory").innerHTML = '<div class="empty">記録なし</div>';
     return;
   }
+
   const bySession = {};
   sets.forEach(function (s) {
     if (!bySession[s.session_id]) bySession[s.session_id] = [];
     bySession[s.session_id].push(s);
   });
+
   el("strengthHistory").innerHTML = sessions.map(function (s) {
     const groups = {};
     (bySession[s.id] || []).forEach(function (set) {
       if (!groups[set.exercise]) groups[set.exercise] = [];
       groups[set.exercise].push(set);
     });
+
     const exercises = Object.keys(groups).map(function (exercise) {
       const lines = groups[exercise].map(function (set) {
         const weight = set.weight_kg == null ? "自重" : round(set.weight_kg, 2) + "kg";
@@ -386,11 +390,18 @@ function renderStrength(sessions, sets) {
         const rir = set.rir == null ? "" : " · RIR " + round(set.rir, 1);
         return '<div class="setLine">' + escapeHtml(weight + " × " + reps + rir) + '</div>';
       }).join("");
-      return '<div class="exerciseBlock"><div class="exerciseName">' + escapeHtml(exercise) + '</div>' + lines + '</div>';
+
+      return '<div class="exerciseBlock">' +
+        '<div class="exerciseName">' + escapeHtml(exercise) + '</div>' +
+        lines +
+        '</div>';
     }).join("");
-    return '<div class="historyItem"><strong>' + escapeHtml(formatClock(s.started_at) || "筋トレ") + '</strong>' +
+
+    return '<div class="historyItem">' +
+      '<strong>' + escapeHtml(formatClock(s.started_at) || "筋トレ") + '</strong>' +
       (s.notes ? '<div class="historyNotes">' + escapeHtml(s.notes) + '</div>' : "") +
-      exercises + '</div>';
+      exercises +
+      '</div>';
   }).join("");
 }
 
@@ -400,6 +411,7 @@ function renderCardio(rows) {
     el("cardioHistory").innerHTML = '<div class="empty">記録なし</div>';
     return;
   }
+
   el("cardioHistory").innerHTML = rows.map(function (c) {
     const meta = [
       c.distance_km == null ? null : round(c.distance_km, 2) + " km",
@@ -407,6 +419,7 @@ function renderCardio(rows) {
       c.avg_hr == null ? null : "Avg HR " + c.avg_hr,
       c.rpe == null ? null : "RPE " + round(c.rpe, 1)
     ].filter(Boolean).join(" · ");
+
     return '<div class="historyItem">' +
       '<strong>' + escapeHtml(c.activity_type) + '</strong>' +
       '<div class="historyMeta">' + escapeHtml(formatClock(c.started_at)) + '</div>' +
@@ -424,10 +437,14 @@ async function loadNutrition() {
     db.from("life_nutrition_daily").select("*").eq("day", day).maybeSingle(),
     db.from("life_micronutrition_daily").select("*").eq("day", day)
   ]);
-  results.forEach(function (r) { if (r.error) throw r.error; });
+
+  results.forEach(function (r) {
+    if (r.error) throw r.error;
+  });
 
   const n = results[0].data || {};
   const itemCount = n.item_count == null ? 0 : n.item_count;
+
   el("nutritionMacroGrid").innerHTML =
     metricCard("Calories", n.calories_kcal, "kcal", targets.calories_kcal, n.calories_known_count, itemCount) +
     metricCard("Protein", n.protein_g, "g", targets.protein_g, n.protein_known_count, itemCount) +
@@ -435,12 +452,15 @@ async function loadNutrition() {
     metricCard("Carbs", n.carbs_g, "g", targets.carbs_g, n.carbs_known_count, itemCount);
 
   const microMap = {};
-  (results[1].data || []).forEach(function (row) { microMap[row.nutrient_code] = row; });
+  (results[1].data || []).forEach(function (row) {
+    microMap[row.nutrient_code] = row;
+  });
   renderMicronutrients(microMap);
 }
 
 function renderMicronutrients(microMap) {
   const host = el("micronutrientList");
+
   if (!nutrientDefs.length) {
     host.innerHTML = '<div class="empty">栄養素定義がありません。</div>';
     return;
@@ -450,11 +470,13 @@ function renderMicronutrients(microMap) {
     const row = microMap[def.code];
     const amount = row ? round(row.amount, 2) : null;
     const target = nutrientTargets[def.code] ? nutrientTargets[def.code].target_ideal : null;
+
     let progress = "";
     if (amount != null && target != null && Number(target) > 0) {
       const pct = Math.max(0, Math.min(100, Number(amount) / Number(target) * 100));
       progress = '<div class="bar"><i style="width:' + pct + '%"></i></div>';
     }
+
     let meta = "未算出";
     if (row) {
       meta = "算出 " + row.known_meal_count + "/" + row.item_count + "件";
@@ -462,11 +484,17 @@ function renderMicronutrients(microMap) {
         meta += " · 推定 " + row.estimated_value_count + "値";
       }
     }
+
     return '<div class="nutrientRow">' +
-      '<div class="nutrientName"><strong>' + escapeHtml(def.name_ja) + '</strong><small>' + escapeHtml(meta) + '</small></div>' +
-      '<div class="nutrientValue">' + (amount == null ? "—" : escapeHtml(amount + " " + def.unit)) + '</div>' +
+      '<div class="nutrientName"><strong>' + escapeHtml(def.name_ja) +
+      '</strong><small>' + escapeHtml(meta) + '</small></div>' +
+      '<div class="nutrientValue">' +
+      (amount == null ? "—" : escapeHtml(amount + " " + def.unit)) +
+      '</div>' +
       '<div class="nutrientProgress">' + progress +
-      (target != null ? '<div class="nutrientMeta">目標 ' + escapeHtml(round(target, 2) + " " + def.unit) + '</div>' : "") +
+      (target != null
+        ? '<div class="nutrientMeta">目標 ' + escapeHtml(round(target, 2) + " " + def.unit) + '</div>'
+        : "") +
       '</div></div>';
   }).join("");
 }
@@ -475,72 +503,26 @@ function addSetRow(values) {
   const row = document.createElement("div");
   row.className = "setRow";
   row.innerHTML =
-    '<input type="number" min="0" step="0.01" placeholder="kg" data-set-weight value="' + escapeHtml(values && values.weight || "") + '">' +
-    '<input type="number" min="0" step="1" placeholder="回数" data-set-reps value="' + escapeHtml(values && values.reps || "") + '">' +
-    '<input type="number" min="0" max="10" step="0.5" placeholder="RIR" data-set-rir value="' + escapeHtml(values && values.rir || "") + '">' +
-    '<select data-set-type><option value="normal">通常</option><option value="warmup">Warmup</option><option value="drop">Drop</option><option value="backoff">Backoff</option><option value="failure">Failure</option><option value="other">Other</option></select>' +
+    '<input type="number" min="0" step="0.01" placeholder="kg" data-set-weight value="' +
+      escapeHtml(values && values.weight || "") + '">' +
+    '<input type="number" min="0" step="1" placeholder="回数" data-set-reps value="' +
+      escapeHtml(values && values.reps || "") + '">' +
+    '<input type="number" min="0" max="10" step="0.5" placeholder="RIR" data-set-rir value="' +
+      escapeHtml(values && values.rir || "") + '">' +
+    '<select data-set-type>' +
+      '<option value="normal">通常</option>' +
+      '<option value="warmup">Warmup</option>' +
+      '<option value="drop">Drop</option>' +
+      '<option value="backoff">Backoff</option>' +
+      '<option value="failure">Failure</option>' +
+      '<option value="other">Other</option>' +
+    '</select>' +
     '<button class="removeSet" type="button" aria-label="セット削除">×</button>';
-  row.querySelector(".removeSet").addEventListener("click", function () { row.remove(); });
-  el("setRows").appendChild(row);
-}
 
-async function saveMeal(event) {
-  event.preventDefault();
-  showMessage("mealMessage", "保存中…", false);
-
-  const payload = {
-    user_id: session.user.id,
-    eaten_at: new Date(el("mealEatenAt").value).toISOString(),
-    meal_type: el("mealType").value,
-    name: el("mealName").value.trim(),
-    quantity_text: el("mealQuantity").value.trim() || null,
-    kcal: numOrNull(el("mealKcal").value),
-    protein_g: numOrNull(el("mealProtein").value),
-    fat_g: numOrNull(el("mealFat").value),
-    carbs_g: numOrNull(el("mealCarbs").value),
-    is_estimated: el("mealEstimated").checked,
-    source: el("mealSource").value.trim() || null,
-    notes: el("mealNotes").value.trim() || null
-  };
-
-  const created = await db.from("life_meals").insert(payload).select("id,eaten_at").single();
-  if (created.error) {
-    showMessage("mealMessage", created.error.message, true);
-    return;
-  }
-
-  const nutrients = [];
-  document.querySelectorAll("[data-meal-nutrient]").forEach(function (input) {
-    const amount = numOrNull(input.value);
-    if (amount == null) return;
-    nutrients.push({
-      meal_id: created.data.id,
-      user_id: session.user.id,
-      nutrient_code: input.getAttribute("data-meal-nutrient"),
-      amount: amount,
-      is_estimated: payload.is_estimated,
-      source: payload.source
-    });
+  row.querySelector(".removeSet").addEventListener("click", function () {
+    row.remove();
   });
-
-  if (nutrients.length) {
-    const nr = await db.from("life_meal_nutrients").insert(nutrients);
-    if (nr.error) {
-      showMessage("mealMessage", "食事は保存済みですが、詳細栄養素の保存に失敗: " + nr.error.message, true);
-      return;
-    }
-  }
-
-  selectedDay = dateInTimezone(new Date(created.data.eaten_at), profile.timezone);
-  el("nutritionDay").value = selectedDay;
-  el("mealName").value = "";
-  el("mealQuantity").value = "";
-  ["mealKcal", "mealProtein", "mealFat", "mealCarbs", "mealSource", "mealNotes"].forEach(function (id) { el(id).value = ""; });
-  document.querySelectorAll("[data-meal-nutrient]").forEach(function (input) { input.value = ""; });
-  el("mealEatenAt").value = toDatetimeLocal(new Date());
-  showMessage("mealMessage", "保存しました。", false);
-  showToast("食事を登録しました");
-  await Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()]);
+  el("setRows").appendChild(row);
 }
 
 async function saveStrength(event) {
@@ -557,7 +539,9 @@ async function saveStrength(event) {
       rir: numOrNull(row.querySelector("[data-set-rir]").value),
       set_type: row.querySelector("[data-set-type]").value
     };
-  }).filter(function (s) { return s.weight_kg != null || s.reps != null; });
+  }).filter(function (s) {
+    return s.weight_kg != null || s.reps != null;
+  });
 
   if (!sets.length) {
     showMessage("strengthMessage", "少なくとも1セット入力してください。", true);
@@ -576,7 +560,10 @@ async function saveStrength(event) {
     return;
   }
 
-  sets.forEach(function (s) { s.session_id = created.data.id; });
+  sets.forEach(function (s) {
+    s.session_id = created.data.id;
+  });
+
   const inserted = await db.from("life_strength_sets").insert(sets);
   if (inserted.error) {
     await db.from("life_workout_sessions").delete().eq("id", created.data.id);
@@ -593,6 +580,7 @@ async function saveStrength(event) {
   addSetRow();
   addSetRow();
   addSetRow();
+
   showMessage("strengthMessage", "保存しました。", false);
   showToast("筋トレを登録しました");
   await Promise.all([loadMonth(), loadSelectedDay()]);
@@ -601,12 +589,15 @@ async function saveStrength(event) {
 async function saveCardio(event) {
   event.preventDefault();
   showMessage("cardioMessage", "保存中…", false);
+
   const created = await db.from("life_cardio_sessions").insert({
     user_id: session.user.id,
     started_at: new Date(el("cardioStartedAt").value).toISOString(),
     activity_type: el("cardioType").value.trim(),
     distance_km: numOrNull(el("cardioDistance").value),
-    duration_sec: el("cardioDurationMin").value === "" ? null : Math.round(Number(el("cardioDurationMin").value) * 60),
+    duration_sec: el("cardioDurationMin").value === ""
+      ? null
+      : Math.round(Number(el("cardioDurationMin").value) * 60),
     avg_hr: numOrNull(el("cardioAvgHr").value),
     max_hr: numOrNull(el("cardioMaxHr").value),
     rpe: numOrNull(el("cardioRpe").value),
@@ -621,7 +612,19 @@ async function saveCardio(event) {
 
   selectedDay = dateInTimezone(new Date(created.data.started_at), profile.timezone);
   el("nutritionDay").value = selectedDay;
-  ["cardioDistance", "cardioDurationMin", "cardioAvgHr", "cardioMaxHr", "cardioRpe", "cardioSource", "cardioNotes"].forEach(function (id) { el(id).value = ""; });
+
+  [
+    "cardioDistance",
+    "cardioDurationMin",
+    "cardioAvgHr",
+    "cardioMaxHr",
+    "cardioRpe",
+    "cardioSource",
+    "cardioNotes"
+  ].forEach(function (id) {
+    el(id).value = "";
+  });
+
   el("cardioStartedAt").value = toDatetimeLocal(new Date());
   showMessage("cardioMessage", "保存しました。", false);
   showToast("有酸素を登録しました");
@@ -631,8 +634,8 @@ async function saveCardio(event) {
 async function saveSettings(event) {
   event.preventDefault();
   showMessage("settingsMessage", "保存中…", false);
-  const timezone = el("timezone").value.trim() || "Asia/Tokyo";
 
+  const timezone = el("timezone").value.trim() || "Asia/Tokyo";
   try {
     new Intl.DateTimeFormat("ja-JP", { timeZone: timezone }).format(new Date());
   } catch (_) {
@@ -678,17 +681,24 @@ async function saveSettings(event) {
 
   const desiredCodes = desired.map(function (x) { return x.nutrient_code; });
   const existingCodes = Object.keys(nutrientTargets);
-  const removed = existingCodes.filter(function (code) { return !desiredCodes.includes(code); });
+  const removed = existingCodes.filter(function (code) {
+    return !desiredCodes.includes(code);
+  });
 
   if (removed.length) {
-    const del = await db.from("life_nutrient_targets").delete().in("nutrient_code", removed).eq("user_id", session.user.id);
+    const del = await db.from("life_nutrient_targets")
+      .delete()
+      .eq("user_id", session.user.id)
+      .in("nutrient_code", removed);
     if (del.error) {
       showMessage("settingsMessage", del.error.message, true);
       return;
     }
   }
+
   if (desired.length) {
-    const up = await db.from("life_nutrient_targets").upsert(desired, { onConflict: "user_id,nutrient_code" });
+    const up = await db.from("life_nutrient_targets")
+      .upsert(desired, { onConflict: "user_id,nutrient_code" });
     if (up.error) {
       showMessage("settingsMessage", up.error.message, true);
       return;
@@ -699,6 +709,7 @@ async function saveSettings(event) {
   selectedDay = dateInTimezone(new Date(), timezone);
   monthCursor = new Date(selectedDay + "T00:00:00");
   el("nutritionDay").value = selectedDay;
+
   await loadSettings();
   await Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()]);
   showMessage("settingsMessage", "保存しました。", false);
@@ -709,10 +720,16 @@ function bindTabs() {
   document.querySelectorAll(".tab").forEach(function (button) {
     button.addEventListener("click", function () {
       const view = button.getAttribute("data-view");
-      document.querySelectorAll(".tab").forEach(function (b) { b.classList.toggle("active", b === button); });
-      document.querySelectorAll("[data-view-panel]").forEach(function (panel) {
-        panel.classList.toggle("active", panel.getAttribute("data-view-panel") === view);
+      document.querySelectorAll(".tab").forEach(function (b) {
+        b.classList.toggle("active", b === button);
       });
+      document.querySelectorAll("[data-view-panel]").forEach(function (panel) {
+        panel.classList.toggle(
+          "active",
+          panel.getAttribute("data-view-panel") === view
+        );
+      });
+
       if (view === "nutrition") loadNutrition().catch(console.error);
       if (view === "settings") loadSettings().catch(console.error);
     });
@@ -721,45 +738,65 @@ function bindTabs() {
 
 function bindEvents() {
   bindTabs();
+
   el("authForm").addEventListener("submit", async function (event) {
     event.preventDefault();
     showMessage("authMessage", "ログイン中…", false);
+
     const result = await db.auth.signInWithPassword({
       email: el("email").value.trim(),
       password: el("password").value
     });
-    if (result.error) showMessage("authMessage", result.error.message, true);
+
+    if (result.error) {
+      showMessage("authMessage", result.error.message, true);
+    }
   });
 
   el("signUpBtn").addEventListener("click", async function () {
     showMessage("authMessage", "登録中…", false);
+
     const result = await db.auth.signUp({
       email: el("email").value.trim(),
       password: el("password").value,
-      options: { emailRedirectTo: window.location.href.split("#")[0] }
+      options: {
+        emailRedirectTo: window.location.href.split("#")[0]
+      }
     });
+
     if (result.error) {
       showMessage("authMessage", result.error.message, true);
     } else if (result.data.session) {
       showMessage("authMessage", "登録しました。", false);
     } else {
-      showMessage("authMessage", "確認メールを送信しました。メール内のリンクを開いてください。", false);
+      showMessage(
+        "authMessage",
+        "確認メールを送信しました。メール内のリンクを開いてください。",
+        false
+      );
     }
   });
 
-  signOutBtn.addEventListener("click", function () { db.auth.signOut(); });
+  signOutBtn.addEventListener("click", function () {
+    db.auth.signOut();
+  });
+
   el("refreshBtn").addEventListener("click", function () {
-    Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()]).then(function () { showToast("更新しました"); }).catch(function (e) { showToast(e.message); });
+    Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()])
+      .then(function () { showToast("更新しました"); })
+      .catch(function (e) { showToast(e.message); });
   });
 
   el("prevMonthBtn").addEventListener("click", function () {
     monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() - 1, 1);
     loadMonth().catch(console.error);
   });
+
   el("nextMonthBtn").addEventListener("click", function () {
     monthCursor = new Date(monthCursor.getFullYear(), monthCursor.getMonth() + 1, 1);
     loadMonth().catch(console.error);
   });
+
   el("todayBtn").addEventListener("click", function () {
     selectedDay = dateInTimezone(new Date(), profile.timezone);
     monthCursor = new Date(selectedDay + "T00:00:00");
@@ -767,12 +804,31 @@ function bindEvents() {
     Promise.all([loadMonth(), loadSelectedDay(), loadNutrition()]).catch(console.error);
   });
 
-  el("nutritionDay").addEventListener("change", function () { loadNutrition().catch(console.error); });
-  el("mealForm").addEventListener("submit", function (e) { saveMeal(e).catch(function (err) { showMessage("mealMessage", err.message, true); }); });
-  el("strengthForm").addEventListener("submit", function (e) { saveStrength(e).catch(function (err) { showMessage("strengthMessage", err.message, true); }); });
-  el("cardioForm").addEventListener("submit", function (e) { saveCardio(e).catch(function (err) { showMessage("cardioMessage", err.message, true); }); });
-  el("settingsForm").addEventListener("submit", function (e) { saveSettings(e).catch(function (err) { showMessage("settingsMessage", err.message, true); }); });
-  el("addSetBtn").addEventListener("click", function () { addSetRow(); });
+  el("nutritionDay").addEventListener("change", function () {
+    loadNutrition().catch(console.error);
+  });
+
+  el("strengthForm").addEventListener("submit", function (event) {
+    saveStrength(event).catch(function (error) {
+      showMessage("strengthMessage", error.message, true);
+    });
+  });
+
+  el("cardioForm").addEventListener("submit", function (event) {
+    saveCardio(event).catch(function (error) {
+      showMessage("cardioMessage", error.message, true);
+    });
+  });
+
+  el("settingsForm").addEventListener("submit", function (event) {
+    saveSettings(event).catch(function (error) {
+      showMessage("settingsMessage", error.message, true);
+    });
+  });
+
+  el("addSetBtn").addEventListener("click", function () {
+    addSetRow();
+  });
 }
 
 async function init() {
@@ -784,20 +840,35 @@ async function init() {
 
   if (!configured) {
     setupWarning.hidden = false;
-    authPanel.querySelectorAll("input,button").forEach(function (node) { node.disabled = true; });
+    authPanel.querySelectorAll("input,button").forEach(function (node) {
+      node.disabled = true;
+    });
     authMessage.textContent = "まず js/config.js を設定してください。";
     return;
   }
 
-  db = window.supabase.createClient(cfg.supabaseUrl, cfg.supabasePublishableKey, {
-    auth: { persistSession: true, autoRefreshToken: true, detectSessionInUrl: true }
-  });
+  db = window.supabase.createClient(
+    cfg.supabaseUrl,
+    cfg.supabasePublishableKey,
+    {
+      auth: {
+        persistSession: true,
+        autoRefreshToken: true,
+        detectSessionInUrl: true
+      }
+    }
+  );
 
   const current = await db.auth.getSession();
   await handleSession(current.data.session);
 
   db.auth.onAuthStateChange(function (_event, nextSession) {
-    if ((session && nextSession && session.access_token === nextSession.access_token) || (!session && !nextSession)) return;
+    const sameSession =
+      session &&
+      nextSession &&
+      session.access_token === nextSession.access_token;
+
+    if (sameSession || (!session && !nextSession)) return;
     handleSession(nextSession).catch(console.error);
   });
 }
